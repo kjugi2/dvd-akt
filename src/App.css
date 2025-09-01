@@ -354,3 +354,262 @@ tbody tr:hover {
   background: #fff;
   color: #111;
 }
+.submenu {
+  margin-left: 16px;
+  display: flex;
+  flex-direction: column;
+}
+
+.sublink {
+  font-size: 0.9em;
+  padding-left: 12px;
+  color: #666;
+}
+
+.sublink.active {
+  font-weight: bold;
+  color: #c00; /* ili tvoja crvena */
+}
+.modal-backdrop {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  background: rgba(0,0,0,0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-content {
+  background: #fff;
+  padding: 20px;
+  border-radius: 12px;
+  min-width: 300px;
+}
+/* Drawer (pop-out) */
+.drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.35);
+  display: flex;
+  justify-content: flex-end;
+  z-index: 60;
+}
+
+.drawer-panel {
+  width: min(420px, 100vw);
+  height: 100%;
+  background: #fff;
+  box-shadow: -8px 0 24px rgba(0,0,0,.2);
+  display: flex;
+  flex-direction: column;
+  animation: slideIn .18s ease-out;
+}
+
+@keyframes slideIn {
+  from { transform: translateX(12px); opacity: .6; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+
+.drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid #eee;
+}
+
+.btn-icon {
+  background: transparent;
+  border: none;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.drawer-body {
+  padding: 16px;
+  overflow: auto;
+  flex: 1;
+}
+
+.drawer-form {
+  display: grid;
+  gap: 12px;
+}
+
+.drawer-form .field {
+  display: grid;
+  gap: 6px;
+}
+
+.drawer-form label {
+  font-size: 13px;
+  color: #444;
+}
+
+.drawer-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+  border-top: 1px solid #eee;
+  padding-top: 12px;
+}
+/* layout */
+.dash .dash-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr; /* lijevo široko, desno uži stupac */
+  grid-auto-rows: minmax(200px, auto);
+  gap: 16px;
+  align-items: start;
+}
+
+.card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 12px;
+  box-shadow: 0 6px 20px rgba(0,0,0,.06);
+  display: flex;
+  flex-direction: column;
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.card-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.btn {
+  padding: 8px 12px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  background: #e53935;
+  color: #fff;
+}
+.btn-secondary {
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background: #f6f6f6;
+  cursor: pointer;
+}
+
+/* zadnje aktivnosti */
+.last-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 320px;   /* scroll ako je puno zapisa */
+  overflow-y: auto;
+}
+.last-row {
+  display: grid;
+  grid-template-columns: 1fr 140px;
+  gap: 8px;
+  padding: 8px;
+  border-radius: 8px;
+  background: #fafafa;
+}
+.last-head {
+  background: transparent;
+  font-weight: 600;
+  padding: 0;
+}
+.last-row .title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.empty {
+  padding: 12px;
+  color: #777;
+}
+
+/* tiles */
+.stats-tiles {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.tile {
+  border-radius: 12px;
+  padding: 14px;
+  color: #111;
+  text-align: center;
+}
+.tile-red { background: #ffebee; }
+.tile-yellow { background: #fff8e1; }
+.tile-gray { background: #eceff1; }
+.tile-big {
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1;
+}
+.tile-sub {
+  font-size: 13px;
+  opacity: .8;
+}
+
+/* bars */
+.bar-wrap {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  height: 200px;
+  padding: 8px 4px;
+  border: 1px solid #eee;
+  border-radius: 10px;
+  background: #fcfcfc;
+}
+.bar-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.bar {
+  width: 100%;
+  max-width: 24px;
+  background: #333;
+  border-radius: 6px 6px 0 0;
+}
+.bar-label {
+  font-size: 11px;
+  color: #666;
+}
+
+/* key-values list */
+.kv {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.kv li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  background: #fafafa;
+  border-radius: 8px;
+}
+.kv li span { color: #666; }
+.kv li b { font-size: 16px; }
+
+/* responsive */
+@media (max-width: 980px) {
+  .dash .dash-grid {
+    grid-template-columns: 1fr;
+  }
+}

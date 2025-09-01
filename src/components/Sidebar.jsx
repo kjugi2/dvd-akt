@@ -1,3 +1,4 @@
+// src/components/Sidebar.jsx
 import { NavLink } from "react-router-dom";
 import logo from "/logo.png"; // ili zamijeni svojom putanjom
 

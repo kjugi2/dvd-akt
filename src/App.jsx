@@ -1,3 +1,4 @@
+// src/App.jsx
 import { Routes, Route } from "react-router-dom";
 
 import Sidebar from "./components/Sidebar";
@@ -9,14 +10,16 @@ import Vozila from "./pages/Vozila";
 import Oprema from "./pages/Oprema";
 import Dogadaji from "./pages/Dogadaji";
 
+
+
 import "./App.css";
 import { useLocalArray } from "./hooks/useLocalStorage";
 
 export default function App() {
-  // kolekcije u localStorage
+  // state u localStorage-u
   const [clanovi, setClanovi] = useLocalArray("clanovi", []);
-  const [vozila, setVozila] = useLocalArray("vozila", []);
-  const [oprema, setOprema] = useLocalArray("oprema", []);
+  const [vozila, setVozila]   = useLocalArray("vozila", []);
+  const [oprema, setOprema]   = useLocalArray("oprema", []);
   const [dogadaji, setDogadaji] = useLocalArray("dogadaji", []);
 
   return (
@@ -44,8 +47,14 @@ export default function App() {
               path="/vozila"
               element={<Vozila vozila={vozila} setVozila={setVozila} />}
             />
+            {/* Oprema root (gumbi s kategorijama) */}
             <Route
               path="/oprema"
+              element={<Oprema oprema={oprema} setOprema={setOprema} />}
+            />
+            {/* Oprema po kategoriji */}
+            <Route
+              path="/oprema/:kat"
               element={<Oprema oprema={oprema} setOprema={setOprema} />}
             />
             <Route
@@ -57,6 +66,18 @@ export default function App() {
                   clanovi={clanovi}
                   vozila={vozila}
                   oprema={oprema}
+                />
+              }
+            />
+            {/* fallback */}
+            <Route
+              path="*"
+              element={
+                <Pocetna
+                  clanovi={clanovi}
+                  vozila={vozila}
+                  oprema={oprema}
+                  dogadaji={dogadaji}
                 />
               }
             />
