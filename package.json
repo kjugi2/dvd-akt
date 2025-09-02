@@ -12,6 +12,7 @@
     "deploy": "gh-pages -d dist"
   },
   "dependencies": {
+    "classnames": "^2.5.1",
     "date-fns": "^4.1.0",
     "react": "^19.1.1",
     "react-datepicker": "^8.7.0",

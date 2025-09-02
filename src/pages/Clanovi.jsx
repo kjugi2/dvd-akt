@@ -1,5 +1,27 @@
+// src/pages/Clanovi.jsx
 import { useState, useMemo } from "react";
 import { makeId } from "../utils/id";
+import DatePicker from "react-datepicker";
+import { registerLocale } from "react-datepicker";
+import hr from "date-fns/locale/hr";
+
+// HR lokalizacija
+registerLocale("hr", hr);
+
+// utili: konverzija datuma
+function toYMD(date) {
+  if (!date) return "";
+  const d = date instanceof Date ? date : new Date(date);
+  if (isNaN(d.getTime())) return "";
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+function fromYMD(ymd) {
+  if (!ymd) return null;
+  const [y, m, d] = ymd.split("-").map(Number);
+  if (!y || !m || !d) return null;
+  return new Date(y, m - 1, d);
+}
 
 export default function Clanovi({ clanovi, setClanovi }) {
   const [showForm, setShowForm] = useState(false);
@@ -10,9 +32,10 @@ export default function Clanovi({ clanovi, setClanovi }) {
   const [uloga, setUloga] = useState("");
   const [telefon, setTelefon] = useState("");
   const [email, setEmail] = useState("");
-  const [datumRodenja, setDatumRodenja] = useState("");
+  // u UI radimo s Date objektima
+  const [datumRodenjaDate, setDatumRodenjaDate] = useState(null);
   const [oib, setOib] = useState("");
-  const [lijecnicki, setLijecnicki] = useState("");
+  const [lijecnickiDate, setLijecnickiDate] = useState(null);
 
   const [editId, setEditId] = useState(null);
 
@@ -22,9 +45,9 @@ export default function Clanovi({ clanovi, setClanovi }) {
     setUloga("");
     setTelefon("");
     setEmail("");
-    setDatumRodenja("");
+    setDatumRodenjaDate(null);
     setOib("");
-    setLijecnicki("");
+    setLijecnickiDate(null);
     setEditId(null);
   };
 
@@ -39,9 +62,9 @@ export default function Clanovi({ clanovi, setClanovi }) {
         uloga,
         telefon,
         email,
-        datumRodenja,
+        datumRodenja: toYMD(datumRodenjaDate), // spremamo "YYYY-MM-DD"
         oib,
-        lijecnicki,
+        lijecnicki: toYMD(lijecnickiDate),     // spremamo "YYYY-MM-DD"
       },
     ]);
     resetForm();
@@ -52,7 +75,17 @@ export default function Clanovi({ clanovi, setClanovi }) {
     if (!editId || !ime.trim() || !prezime.trim() || !uloga) return;
     const copy = clanovi.map((c) =>
       c.id === editId
-        ? { ...c, ime, prezime, uloga, telefon, email, datumRodenja, oib, lijecnicki }
+        ? {
+            ...c,
+            ime,
+            prezime,
+            uloga,
+            telefon,
+            email,
+            datumRodenja: toYMD(datumRodenjaDate),
+            oib,
+            lijecnicki: toYMD(lijecnickiDate),
+          }
         : c
     );
     setClanovi(copy);
@@ -64,14 +97,14 @@ export default function Clanovi({ clanovi, setClanovi }) {
     const c = clanovi.find((x) => x.id === id);
     if (!c) return;
     setEditId(id);
-    setIme(c.ime);
-    setPrezime(c.prezime);
-    setUloga(c.uloga);
+    setIme(c.ime || "");
+    setPrezime(c.prezime || "");
+    setUloga(c.uloga || "");
     setTelefon(c.telefon || "");
     setEmail(c.email || "");
-    setDatumRodenja(c.datumRodenja || "");
+    setDatumRodenjaDate(fromYMD(c.datumRodenja || ""));
     setOib(c.oib || "");
-    setLijecnicki(c.lijecnicki || "");
+    setLijecnickiDate(fromYMD(c.lijecnicki || ""));
     setShowForm(true);
   };
 
@@ -149,100 +182,121 @@ export default function Clanovi({ clanovi, setClanovi }) {
           <div className="modal">
             <h3>{editId ? "Uredi člana" : "Dodaj člana"}</h3>
 
-            <div className="form-col">
-              <label>Ime</label>
-              <input
-                type="text"
-                placeholder="Ime"
-                value={ime}
-                onChange={(e) => setIme(e.target.value)}
-              />
-            </div>
+            {/* preporuka: ako ti modal reže popup, omotaj polja u .modal-body koja skrola */}
+            <div className="modal-body">
+              <div className="form-col">
+                <label>Ime</label>
+                <input
+                  type="text"
+                  placeholder="Ime"
+                  value={ime}
+                  onChange={(e) => setIme(e.target.value)}
+                />
+              </div>
 
-            <div className="form-col">
-              <label>Prezime</label>
-              <input
-                type="text"
-                placeholder="Prezime"
-                value={prezime}
-                onChange={(e) => setPrezime(e.target.value)}
-              />
-            </div>
+              <div className="form-col">
+                <label>Prezime</label>
+                <input
+                  type="text"
+                  placeholder="Prezime"
+                  value={prezime}
+                  onChange={(e) => setPrezime(e.target.value)}
+                />
+              </div>
 
-            <div className="form-col">
-              <label>Uloga</label>
-              <select value={uloga} onChange={(e) => setUloga(e.target.value)}>
-                <option value="">Odaberi ulogu…</option>
-                <option>Član</option>
-                <option>Zapovjednik</option>
-                <option>Tajnik</option>
-                <option>Ostalo</option>
-              </select>
-            </div>
+              <div className="form-col">
+                <label>Uloga</label>
+                <select value={uloga} onChange={(e) => setUloga(e.target.value)}>
+                  <option value="">Odaberi ulogu…</option>
+                  <option>Član</option>
+                  <option>Zapovjednik</option>
+                  <option>Tajnik</option>
+                  <option>Ostalo</option>
+                </select>
+              </div>
 
-            <div className="form-col">
-              <label>Telefon</label>
-              <input
-                type="text"
-                placeholder="npr. 0911234567"
-                value={telefon}
-                onChange={(e) => setTelefon(e.target.value)}
-              />
-            </div>
+              <div className="form-col">
+                <label>Telefon</label>
+                <input
+                  type="text"
+                  placeholder="npr. 0911234567"
+                  value={telefon}
+                  onChange={(e) => setTelefon(e.target.value)}
+                />
+              </div>
 
-            <div className="form-col">
-              <label>Email</label>
-              <input
-                type="email"
-                placeholder="ime.prezime@email.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
-            </div>
+              <div className="form-col">
+                <label>Email</label>
+                <input
+                  type="email"
+                  placeholder="ime.prezime@email.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
+              </div>
 
-            <div className="form-col">
-              <label>Datum rođenja</label>
-              <input
-                type="date"
-                value={datumRodenja}
-                onChange={(e) => setDatumRodenja(e.target.value)}
-              />
-            </div>
+              <div className="form-col">
+                <label>Datum rođenja</label>
+                <DatePicker
+                  selected={datumRodenjaDate}
+                  onChange={(d) => setDatumRodenjaDate(d)}
+                  dateFormat="dd.MM.yyyy"
+                  placeholderText="Odaberi datum"
+                  locale="hr"
+                  showMonthDropdown
+                  showYearDropdown
+                  dropdownMode="select"
+                  isClearable
+                  withPortal
+                  portalId="root"
+                  popperClassName="react-datepicker-popper"
+                />
+              </div>
 
-            <div className="form-col">
-              <label>OIB</label>
-              <input
-                type="text"
-                placeholder="11 znamenki"
-                value={oib}
-                onChange={(e) => setOib(e.target.value)}
-              />
-            </div>
+              <div className="form-col">
+                <label>OIB</label>
+                <input
+                  type="text"
+                  placeholder="11 znamenki"
+                  value={oib}
+                  onChange={(e) => setOib(e.target.value)}
+                />
+              </div>
 
-            <div className="form-col">
-              <label>Liječnički pregled</label>
-              <input
-                type="date"
-                value={lijecnicki}
-                onChange={(e) => setLijecnicki(e.target.value)}
-              />
-            </div>
+              <div className="form-col">
+                <label>Liječnički pregled</label>
+                <DatePicker
+                  selected={lijecnickiDate}
+                  onChange={(d) => setLijecnickiDate(d)}
+                  dateFormat="dd.MM.yyyy"
+                  placeholderText="Odaberi datum"
+                  locale="hr"
+                  showMonthDropdown
+                  showYearDropdown
+                  dropdownMode="select"
+                  isClearable
+                  withPortal
+                  portalId="root"
+                  popperClassName="react-datepicker-popper"
+                />
+              </div>
 
-            <div className="form-row">
-              {editId ? (
-                <button onClick={spremiClana}>Spremi izmjene</button>
-              ) : (
-                <button onClick={dodajClana}>Spremi</button>
-              )}
-              <button
-                className="btn-secondary"
-                onClick={() => {
-                  resetForm();
-                  setShowForm(false);
-                }}
-              >
-                Odustani
-              </button>
+              <div className="form-row">
+                {editId ? (
+                  <button onClick={spremiClana}>Spremi izmjene</button>
+                ) : (
+                  <button onClick={dodajClana}>Spremi</button>
+                )}
+                <button
+                  className="btn-secondary"
+                  onClick={() => {
+                    resetForm();
+                    setShowForm(false);
+                  }}
+                >
+                  Odustani
+                </button>
+              </div>
             </div>
           </div>
         </div>

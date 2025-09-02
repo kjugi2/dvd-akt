@@ -1,5 +1,25 @@
+// src/pages/Vozila.jsx
 import { useState, useMemo } from "react";
-import { v4 as uuidv4 } from "uuid"; // ako nemaš, instaliraj: npm install uuid
+import { v4 as uuidv4 } from "uuid"; // npm i uuid
+import DatePicker from "react-datepicker";
+import { registerLocale } from "react-datepicker";
+import hr from "date-fns/locale/hr";
+registerLocale("hr", hr);
+
+// helperi za "YYYY-MM-DD"
+function toYMD(date) {
+  if (!date) return "";
+  const d = date instanceof Date ? date : new Date(date);
+  if (isNaN(d.getTime())) return "";
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+function fromYMD(ymd) {
+  if (!ymd) return null;
+  const [y, m, d] = ymd.split("-").map(Number);
+  if (!y || !m || !d) return null;
+  return new Date(y, m - 1, d);
+}
 
 export default function Vozila({ vozila, setVozila }) {
   const [showForm, setShowForm] = useState(false);
@@ -8,8 +28,9 @@ export default function Vozila({ vozila, setVozila }) {
   const [tip, setTip] = useState("");
   const [model, setModel] = useState("");
   const [registracija, setRegistracija] = useState("");
-  const [tehnicki, setTehnicki] = useState("");
-  const [servis, setServis] = useState("");
+  // u UI držimo Date objekte, u bazi/tablici "YYYY-MM-DD"
+  const [tehnickiDate, setTehnickiDate] = useState(null);
+  const [servisDate, setServisDate] = useState(null);
   const [status, setStatus] = useState("");
 
   const [editId, setEditId] = useState(null);
@@ -18,8 +39,8 @@ export default function Vozila({ vozila, setVozila }) {
     setTip("");
     setModel("");
     setRegistracija("");
-    setTehnicki("");
-    setServis("");
+    setTehnickiDate(null);
+    setServisDate(null);
     setStatus("");
     setEditId(null);
   };
@@ -33,8 +54,8 @@ export default function Vozila({ vozila, setVozila }) {
       tip,
       model,
       registracija,
-      tehnicki: tehnicki || null,
-      servis: servis || null,
+      tehnicki: toYMD(tehnickiDate), // spremamo string
+      servis: toYMD(servisDate),     // spremamo string
       status,
     };
 
@@ -54,8 +75,8 @@ export default function Vozila({ vozila, setVozila }) {
             tip,
             model,
             registracija,
-            tehnicki: tehnicki || null,
-            servis: servis || null,
+            tehnicki: toYMD(tehnickiDate),
+            servis: toYMD(servisDate),
             status,
           }
         : v
@@ -71,12 +92,12 @@ export default function Vozila({ vozila, setVozila }) {
     const v = vozila.find((x) => x.id === id);
     if (!v) return;
     setEditId(id);
-    setTip(v.tip);
-    setModel(v.model);
-    setRegistracija(v.registracija);
-    setTehnicki(v.tehnicki || "");
-    setServis(v.servis || "");
-    setStatus(v.status);
+    setTip(v.tip || "");
+    setModel(v.model || "");
+    setRegistracija(v.registracija || "");
+    setTehnickiDate(fromYMD(v.tehnicki || ""));
+    setServisDate(fromYMD(v.servis || ""));
+    setStatus(v.status || "");
     setShowForm(true);
   };
 
@@ -125,12 +146,14 @@ export default function Vozila({ vozila, setVozila }) {
                 <td>{v.servis || "—"}</td>
                 <td>{v.status}</td>
                 <td>
-                  <button className="btn-secondary" onClick={() => uredi(v.id)}>
-                    Uredi
-                  </button>
-                  <button className="btn-danger" onClick={() => obrisi(v.id)}>
-                    Obriši
-                  </button>
+                  <div className="actions">
+                    <button className="btn-secondary" onClick={() => uredi(v.id)}>
+                      Uredi
+                    </button>
+                    <button className="btn-danger" onClick={() => obrisi(v.id)}>
+                      Obriši
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -149,77 +172,97 @@ export default function Vozila({ vozila, setVozila }) {
           <div className="modal">
             <h3>{editId ? "Uredi vozilo" : "Dodaj vozilo"}</h3>
 
-            <div className="form-col">
-              <label>Tipizacija vozila</label>
-              <select value={tip} onChange={(e) => setTip(e.target.value)}>
-                <option value="">Odaberi tip…</option>
-                <option>Navalno vozilo</option>
-                <option>Kombi</option>
-                <option>Ostalo</option>
-              </select>
-            </div>
+            <div className="modal-body">
+              <div className="form-col">
+                <label>Tipizacija vozila</label>
+                <select value={tip} onChange={(e) => setTip(e.target.value)}>
+                  <option value="">Odaberi tip…</option>
+                  <option>Navalno vozilo</option>
+                  <option>Kombi</option>
+                  <option>Ostalo</option>
+                </select>
+              </div>
 
-            <div className="form-col">
-              <label>Model</label>
-              <input
-                type="text"
-                value={model}
-                onChange={(e) => setModel(e.target.value)}
-              />
-            </div>
+              <div className="form-col">
+                <label>Model</label>
+                <input
+                  type="text"
+                  value={model}
+                  onChange={(e) => setModel(e.target.value)}
+                />
+              </div>
 
-            <div className="form-col">
-              <label>Registracija</label>
-              <input
-                type="text"
-                value={registracija}
-                onChange={(e) => setRegistracija(e.target.value)}
-              />
-            </div>
+              <div className="form-col">
+                <label>Registracija</label>
+                <input
+                  type="text"
+                  value={registracija}
+                  onChange={(e) => setRegistracija(e.target.value)}
+                />
+              </div>
 
-            <div className="form-col">
-              <label>Tehnički</label>
-              <input
-                type="date"
-                value={tehnicki}
-                onChange={(e) => setTehnicki(e.target.value)}
-              />
-            </div>
+              <div className="form-col">
+                <label>Tehnički</label>
+                <DatePicker
+                  selected={tehnickiDate}
+                  onChange={(d) => setTehnickiDate(d)}
+                  dateFormat="dd.MM.yyyy"
+                  placeholderText="Odaberi datum"
+                  locale="hr"
+                  showMonthDropdown
+                  showYearDropdown
+                  dropdownMode="select"
+                  isClearable
+                  withPortal
+                  portalId="root"
+                  popperClassName="react-datepicker-popper"
+                />
+              </div>
 
-            <div className="form-col">
-              <label>Servis</label>
-              <input
-                type="date"
-                value={servis}
-                onChange={(e) => setServis(e.target.value)}
-              />
-            </div>
+              <div className="form-col">
+                <label>Servis</label>
+                <DatePicker
+                  selected={servisDate}
+                  onChange={(d) => setServisDate(d)}
+                  dateFormat="dd.MM.yyyy"
+                  placeholderText="Odaberi datum"
+                  locale="hr"
+                  showMonthDropdown
+                  showYearDropdown
+                  dropdownMode="select"
+                  isClearable
+                  withPortal
+                  portalId="root"
+                  popperClassName="react-datepicker-popper"
+                />
+              </div>
 
-            <div className="form-col">
-              <label>Status</label>
-              <select value={status} onChange={(e) => setStatus(e.target.value)}>
-                <option value="">Odaberi status…</option>
-                <option>Operativno</option>
-                <option>U servisu</option>
-                <option>Neispravno</option>
-              </select>
-            </div>
+              <div className="form-col">
+                <label>Status</label>
+                <select value={status} onChange={(e) => setStatus(e.target.value)}>
+                  <option value="">Odaberi status…</option>
+                  <option>Operativno</option>
+                  <option>U servisu</option>
+                  <option>Neispravno</option>
+                </select>
+              </div>
 
-            <div className="form-row">
-              {editId ? (
-                <button onClick={spremiVozilo}>Spremi izmjene</button>
-              ) : (
-                <button onClick={dodajVozilo}>Spremi</button>
-              )}
-              <button
-                className="btn-secondary"
-                onClick={() => {
-                  resetForm();
-                  setShowForm(false);
-                }}
-              >
-                Odustani
-              </button>
+              <div className="form-row">
+                {editId ? (
+                  <button onClick={spremiVozilo}>Spremi izmjene</button>
+                ) : (
+                  <button onClick={dodajVozilo}>Spremi</button>
+                )}
+                <button
+                  className="btn-secondary"
+                  onClick={() => {
+                    resetForm();
+                    setShowForm(false);
+                  }}
+                >
+                  Odustani
+                </button>
+              </div>
             </div>
           </div>
         </div>

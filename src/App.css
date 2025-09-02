@@ -1,12 +1,29 @@
-.app-container {
-  display: grid;
-  grid-template-columns: 220px 1fr;
-  height: 100vh;
-  font-family: Arial, sans-serif;
+/* ================== App.css (FUZIJA) ================== */
+/* — Layout osnova: sidebar + full-width content (ne diraj) — */
+
+/* Reset */
+*,
+*::before,
+*::after { box-sizing: border-box; }
+html, body, #root {
+  color: #000;
+  height: 100%;
+  width: 100%;
   margin: 0;
+  padding: 0;
+  background: #111; /* pozadina iza desne bijele kolone */
+  font-family: Arial, sans-serif;
 }
 
-/* ---------------- Sidebar ---------------- */
+/* Glavni grid: sidebar lijevo, content desno */
+.app-container {
+  display: grid;
+  grid-template-columns: 220px 1fr; /* 220px sidebar + ostatak content */
+  height: 100vh;
+  width: 100%;
+}
+
+/* Sidebar */
 .sidebar {
   background-color: #222; /* jednobojni sidebar */
   color: white;
@@ -35,10 +52,7 @@
   gap: 8px;
   font-size: 13px;
 }
-.sidebar nav {
-  width: 100%;
-  margin-top: 8px;
-}
+.sidebar nav { width: 100%; margin-top: 8px; }
 .sidebar .navlink {
   display: block;
   color: white;
@@ -48,34 +62,40 @@
   border-radius: 6px;
   transition: background 0.25s;
 }
-.sidebar .navlink:hover {
-  background-color: #555;
-}
+.sidebar .navlink:hover { background-color: #555; }
 .sidebar .navlink.active {
   background-color: #3a3a3a;
   font-weight: 600;
 }
 
-/* ---------------- Glavni sadržaj ---------------- */
+/* Desna kolona — BIJELO, FULL-WIDTH (zakucano) */
 .main-content {
   display: flex;
   flex-direction: column;
-  padding: 20px;
+  min-width: 0;              /* sprječava skupljanje */
+  width: 100% !important;
   height: 100vh;
-  box-sizing: border-box;
-  background: #fff;
-  color: #111;
-}
-.main-content h2 {
-  margin: 0 0 12px 0;
-}
-.content {
-  flex: 1; /* gura footer dolje */
-  display: flex;
-  flex-direction: column;
+  background: #fff !important;
+  overflow: hidden;          /* skrol ide u .content */
 }
 
-/* ---------------- Forme i polja ---------------- */
+/* Unutarnji sadržaj — rastegnut, bez max-width */
+.content {
+  flex: 1 1 auto !important;
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 20px;             /* smanji/ukloni ako želiš full-bleed */
+  box-sizing: border-box;
+  background: #fff !important;
+  overflow: auto;
+}
+
+.main-content h2 { margin: 0 0 12px 0; }
+
+/* ================== TVOJI KOMPONENTNI STILOVI ================== */
+
+/* Forme i polja */
 .form-row {
   display: flex;
   flex-wrap: wrap;
@@ -98,7 +118,7 @@ select[multiple] {
   min-height: 120px;
 }
 
-/* ---------------- Gumbi ---------------- */
+/* Gumbi */
 button {
   background-color: #666;   /* sivi default */
   color: white;
@@ -108,34 +128,20 @@ button {
   cursor: pointer;
   transition: background 0.25s;
 }
-button:hover {
-  background-color: #444;   /* tamnije sivi hover */
-}
+button:hover { background-color: #444; }
+.btn-secondary { background-color: #777; }
+.btn-secondary:hover { background-color: #555; }
+.btn-danger { background-color: #b3261e; }
+.btn-danger:hover { background-color: #9a1f19; }
 
-.btn-secondary {
-  background-color: #777;
-}
-.btn-secondary:hover {
-  background-color: #555;
-}
-
-.btn-danger {
-  background-color: #b3261e; /* crveni samo za opasne akcije */
-}
-.btn-danger:hover {
-  background-color: #9a1f19;
-}
-
-/* ---------------- Liste/Tablice ---------------- */
+/* Liste/Tablice */
 .list-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin: 6px 0 12px;
 }
-.search {
-  min-width: 220px;
-}
+.search { min-width: 220px; }
 
 .table-wrap {
   overflow: auto;
@@ -160,25 +166,10 @@ tbody td {
   border-bottom: 1px solid #eee;
   padding: 10px;
 }
-tbody tr:hover {
-  background: #fafafa;
-}
-.actions {
-  display: flex;
-  gap: 8px;
-}
+tbody tr:hover { background: #fafafa; }
+.actions { display: flex; gap: 8px; }
 
-/* badge za tip aktivnosti */
-.badge {
-  display: inline-block;
-  padding: 2px 8px;
-  border-radius: 999px;
-  font-size: 12px;
-  border: 1px solid #e5e5e5;
-  background: #f7f7f7;
-}
-
-/* ---------------- Info box ---------------- */
+/* Info box */
 .info {
   padding: 10px 12px;
   border: 1px solid #e5e5e5;
@@ -189,7 +180,7 @@ tbody tr:hover {
   font-size: 14px;
 }
 
-/* ---------------- Footer ---------------- */
+/* Footer (komponenta Footer koristi .footer klasu) */
 .footer {
   padding: 10px;
   text-align: center;
@@ -198,40 +189,8 @@ tbody tr:hover {
   font-size: 13px;
   margin-top: 16px;
 }
-/* Modal */
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0,0,0,0.5);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-.modal {
-  background: #fff;
-  padding: 20px;
-  border-radius: 8px;
-  width: 400px;
-  max-width: 90%;
-}
-.form-col {
-  display: flex;
-  flex-direction: column;
-  margin-bottom: 12px;
-}
-.form-col label {
-  font-size: 13px;
-  margin-bottom: 4px;
-  color: #333;
-}
-.navlink.active {
-  background-color: #3a3a3a;
-  font-weight: bold;
-}
-/* Tagovi (članovi, vozila, oprema) */
+
+/* Tagovi */
 .tag {
   display: inline-block;
   background: #eee;
@@ -241,20 +200,41 @@ tbody tr:hover {
   border-radius: 6px;
   font-size: 12px;
 }
-.tag:hover {
-  background: #ccc;
+.tag:hover { background: #ddd; }
+
+/* Badge */
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  border: 1px solid #e5e5e5;
+  background: #f7f7f7;
 }
 
-/* Širi modal */
-.modal-wide {
-  width: 700px;
+/* Modal (generički) */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+.modal {
+  background: #fff;
+  padding: 20px;
+  border-radius: 8px;
+  width: 420px;
   max-width: 95%;
+  max-height: 90vh;
+  overflow: auto;
 }
+.modal-wide { width: 700px; max-width: 95%; }
+
 /* Detalji ispod retka */
-.details-cell {
-  background: #fcfcfc;
-  padding: 14px 16px;
-}
+.details-cell { background: #fcfcfc; padding: 14px 16px; }
 .details-grid {
   display: grid;
   gap: 12px;
@@ -267,84 +247,9 @@ tbody tr:hover {
   text-transform: uppercase;
   letter-spacing: 0.3px;
 }
-.details-text {
-  font-size: 14px;
-}
+.details-text { font-size: 14px; }
 
-/* Tagovi za članove/vozila/opremu */
-.tag {
-  display: inline-block;
-  background: #eee;
-  color: #333;
-  padding: 3px 8px;
-  margin: 2px;
-  border-radius: 6px;
-  font-size: 12px;
-}
-.tag:hover { background: #ddd; }
-
-/* Modal: širi + skrolabilan sadržaj + ESC close (JS dio je u komponenti) */
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-.modal {
-  background: #fff;
-  border-radius: 8px;
-  width: 420px;
-  max-width: 95%;
-  padding: 20px;
-  max-height: 90vh;   /* omogućuje scroll */
-  overflow: auto;     /* scroll kotačić radi */
-}
-.modal-wide {
-  width: 700px;
-}
-
-/* Pomoćni badge za tip */
-.badge {
-  display: inline-block;
-  padding: 2px 8px;
-  border-radius: 999px;
-  font-size: 12px;
-  border: 1px solid #e5e5e5;
-  background: #f7f7f7;
-}
-/* Picker (checkbox + search) */
-.picker {
-  border: 1px solid #e5e5e5;
-  border-radius: 8px;
-  background: #fff;
-}
-.picker-search {
-  width: 100%;
-  border: 0;
-  border-bottom: 1px solid #eee;
-  padding: 8px 10px;
-  outline: none;
-}
-.picker-list {
-  max-height: 220px;      /* scroll unutar pickera */
-  overflow: auto;
-  padding: 6px 8px;
-}
-.picker-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 4px;
-  cursor: pointer;
-  user-select: none;
-}
-.picker-item:hover { background: #f7f7f7; }
-.picker-empty { color: #777; font-size: 13px; padding: 8px; }
-
-/* (podsjetnik) modal već ima max-height i overflow: auto — kotačić radi */
+/* Input-like */
 .input-like {
   width: 100%;
   padding: 8px 10px;
@@ -354,38 +259,16 @@ tbody tr:hover {
   background: #fff;
   color: #111;
 }
+
+/* Submenu linkovi */
 .submenu {
   margin-left: 16px;
   display: flex;
   flex-direction: column;
 }
+.sublink { font-size: 0.9em; padding-left: 12px; color: #666; }
+.sublink.active { font-weight: bold; color: #c00; }
 
-.sublink {
-  font-size: 0.9em;
-  padding-left: 12px;
-  color: #666;
-}
-
-.sublink.active {
-  font-weight: bold;
-  color: #c00; /* ili tvoja crvena */
-}
-.modal-backdrop {
-  position: fixed;
-  top: 0; left: 0;
-  width: 100%; height: 100%;
-  background: rgba(0,0,0,0.4);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.modal-content {
-  background: #fff;
-  padding: 20px;
-  border-radius: 12px;
-  min-width: 300px;
-}
 /* Drawer (pop-out) */
 .drawer-backdrop {
   position: fixed;
@@ -395,7 +278,6 @@ tbody tr:hover {
   justify-content: flex-end;
   z-index: 60;
 }
-
 .drawer-panel {
   width: min(420px, 100vw);
   height: 100%;
@@ -405,12 +287,10 @@ tbody tr:hover {
   flex-direction: column;
   animation: slideIn .18s ease-out;
 }
-
 @keyframes slideIn {
   from { transform: translateX(12px); opacity: .6; }
   to   { transform: translateX(0);    opacity: 1; }
 }
-
 .drawer-header {
   display: flex;
   align-items: center;
@@ -418,7 +298,6 @@ tbody tr:hover {
   padding: 14px 16px;
   border-bottom: 1px solid #eee;
 }
-
 .btn-icon {
   background: transparent;
   border: none;
@@ -426,28 +305,10 @@ tbody tr:hover {
   line-height: 1;
   cursor: pointer;
 }
-
-.drawer-body {
-  padding: 16px;
-  overflow: auto;
-  flex: 1;
-}
-
-.drawer-form {
-  display: grid;
-  gap: 12px;
-}
-
-.drawer-form .field {
-  display: grid;
-  gap: 6px;
-}
-
-.drawer-form label {
-  font-size: 13px;
-  color: #444;
-}
-
+.drawer-body { padding: 16px; overflow: auto; flex: 1; }
+.drawer-form { display: grid; gap: 12px; }
+.drawer-form .field { display: grid; gap: 6px; }
+.drawer-form label { font-size: 13px; color: #444; }
 .drawer-actions {
   display: flex;
   justify-content: flex-end;
@@ -456,7 +317,8 @@ tbody tr:hover {
   border-top: 1px solid #eee;
   padding-top: 12px;
 }
-/* layout */
+
+/* Dashboard / Cards / Tiles */
 .dash .dash-grid {
   display: grid;
   grid-template-columns: 2fr 1fr; /* lijevo široko, desno uži stupac */
@@ -464,7 +326,6 @@ tbody tr:hover {
   gap: 16px;
   align-items: start;
 }
-
 .card {
   background: #fff;
   border-radius: 12px;
@@ -473,36 +334,24 @@ tbody tr:hover {
   display: flex;
   flex-direction: column;
 }
-
 .card-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   margin-bottom: 8px;
 }
+.card-actions { display: flex; gap: 8px; }
 
-.card-actions {
-  display: flex;
-  gap: 8px;
-}
-
-.btn {
-  padding: 8px 12px;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  background: #e53935;
-  color: #fff;
-}
+.btn { padding: 8px 12px; border: none; border-radius: 8px; cursor: pointer; background: #e53935; color: #fff; }
 .btn-secondary {
   padding: 8px 12px;
   border: 1px solid #ddd;
   border-radius: 8px;
-  background: #f6f6f6;
+  background: #1a1a1a;
   cursor: pointer;
 }
 
-/* zadnje aktivnosti */
+/* Zadnje aktivnosti lista */
 .last-list {
   display: flex;
   flex-direction: column;
@@ -518,22 +367,15 @@ tbody tr:hover {
   border-radius: 8px;
   background: #fafafa;
 }
-.last-head {
-  background: transparent;
-  font-weight: 600;
-  padding: 0;
-}
+.last-head { background: transparent; font-weight: 600; padding: 0; }
 .last-row .title {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.empty {
-  padding: 12px;
-  color: #777;
-}
+.empty { padding: 12px; color: #777; }
 
-/* tiles */
+/* Tiles */
 .stats-tiles {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -549,17 +391,10 @@ tbody tr:hover {
 .tile-red { background: #ffebee; }
 .tile-yellow { background: #fff8e1; }
 .tile-gray { background: #eceff1; }
-.tile-big {
-  font-size: 28px;
-  font-weight: 700;
-  line-height: 1;
-}
-.tile-sub {
-  font-size: 13px;
-  opacity: .8;
-}
+.tile-big { font-size: 28px; font-weight: 700; line-height: 1; }
+.tile-sub { font-size: 13px; opacity: .8; }
 
-/* bars */
+/* Bars (mini chart) */
 .bar-wrap {
   display: flex;
   align-items: flex-end;
@@ -583,12 +418,9 @@ tbody tr:hover {
   background: #333;
   border-radius: 6px 6px 0 0;
 }
-.bar-label {
-  font-size: 11px;
-  color: #666;
-}
+.bar-label { font-size: 11px; color: #666; }
 
-/* key-values list */
+/* Key-Values list */
 .kv {
   list-style: none;
   margin: 0;
@@ -607,9 +439,63 @@ tbody tr:hover {
 .kv li span { color: #666; }
 .kv li b { font-size: 16px; }
 
-/* responsive */
+/* Responsive */
 @media (max-width: 980px) {
-  .dash .dash-grid {
-    grid-template-columns: 1fr;
-  }
+  .dash .dash-grid { grid-template-columns: 1fr; }
+}
+
+/* React DatePicker iznad modala */
+.react-datepicker-popper { z-index: 4000 !important; }
+
+/* Modal form layout */
+.modal {
+  background: #fff;
+  border-radius: 12px;
+  width: 600px;          /* širi modal */
+  max-width: 95%;
+  padding: 20px;
+  max-height: 90vh;
+  overflow: hidden;      /* skrol u .modal-body */
+  display: flex;
+  flex-direction: column;
+}
+
+.modal h3 {
+  margin-top: 0;
+  margin-bottom: 16px;
+  font-size: 20px;
+}
+
+.modal-body {
+  flex: 1;
+  overflow-y: auto;      /* ako ima puno polja, skrola unutar tijela */
+  display: grid;
+  gap: 14px;             /* razmak između polja */
+}
+
+/* Svako polje = stupac */
+.form-col {
+  display: flex;
+  flex-direction: column;
+}
+.form-col label {
+  font-size: 13px;
+  margin-bottom: 4px;
+  font-weight: 600;
+  color: #333;
+}
+.form-col input,
+.form-col select {
+  padding: 8px 10px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+/* Dugmad na dnu forme */
+.modal .form-row {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 16px;
 }
