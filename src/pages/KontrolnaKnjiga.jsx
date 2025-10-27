@@ -1,9 +1,9 @@
 // src/pages/KontrolnaKnjiga.jsx
 import { useEffect, useMemo, useState } from "react";
-import { v4 as uuidv4 } from "uuid";
 import DatePicker, { registerLocale } from "react-datepicker";
 import hr from "date-fns/locale/hr";
 import "react-datepicker/dist/react-datepicker.css";
+import { KontrolnaKnjigaAPI } from "../services/db";
 
 registerLocale("hr", hr);
 
@@ -37,24 +37,6 @@ function parseLiters(val) {
   const s = String(val).replace(",", ".").trim();
   const num = parseFloat(s.replace(/[^\d.]+/g, ""));
   return isNaN(num) ? 0 : num;
-}
-
-/* ===== localStorage hook ===== */
-function useLocalStorage(key, initial) {
-  const [state, setState] = useState(() => {
-    try {
-      const raw = localStorage.getItem(key);
-      return raw ? JSON.parse(raw) : initial;
-    } catch {
-      return initial;
-    }
-  });
-  useEffect(() => {
-    try {
-      localStorage.setItem(key, JSON.stringify(state));
-    } catch {}
-  }, [key, state]);
-  return [state, setState];
 }
 
 /* ===== Modal ===== */
@@ -118,7 +100,8 @@ function Modal({ open, onClose, title, children, maxWidth = 900 }) {
 
 /* ===== Glavna stranica ===== */
 export default function KontrolnaKnjiga({ clanovi = [] }) {
-  const [oprema, setOprema] = useLocalStorage("dvd.kontrolna.knjiga", []);
+  // podatke čitamo iz Firestore-a (kontrolnaKnjiga)
+  const [oprema, setOprema] = useState([]);
 
   const [addEquipOpen, setAddEquipOpen] = useState(false);
   const [editEquip, setEditEquip] = useState(null);
@@ -136,6 +119,15 @@ export default function KontrolnaKnjiga({ clanovi = [] }) {
   const [fOpis, setFOpis] = useState("");
   const [fGorivo, setFGorivo] = useState("");
   const [fKorisnik, setFKorisnik] = useState("");
+
+  // Realtime subscribe + ESC zatvaranje
+  useEffect(() => {
+    let unsub;
+    (async () => {
+      unsub = await KontrolnaKnjigaAPI.subscribe(setOprema);
+    })();
+    return () => unsub && unsub();
+  }, []);
 
   useEffect(() => {
     const onEsc = (e) => {
@@ -157,40 +149,46 @@ export default function KontrolnaKnjiga({ clanovi = [] }) {
     "Pumpe",
   ];
 
-  /* ==== OPREMA ==== */
-  function addOrUpdateEquipment() {
+  /* ==== OPREMA (Firestore) ==== */
+  async function addOrUpdateEquipment() {
     const naziv = newEquipName.trim();
     if (!naziv || !newEquipCat) return;
 
-    if (editEquip) {
-      setOprema((prev) =>
-        prev.map((o) =>
-          o.id === editEquip.id
-            ? { ...o, naziv, kategorija: newEquipCat }
-            : o
-        )
-      );
-    } else {
-      const item = {
-        id: uuidv4(),
-        naziv,
-        kategorija: newEquipCat,
-        unosi: [],
-      };
-      setOprema((prev) => [item, ...prev]);
+    try {
+      if (editEquip) {
+        await KontrolnaKnjigaAPI.update(editEquip.id, {
+          naziv,
+          kategorija: newEquipCat,
+          // unosi ostaju kakvi jesu (ne diramo ih ovdje)
+        });
+      } else {
+        await KontrolnaKnjigaAPI.create({
+          naziv,
+          kategorija: newEquipCat,
+          unosi: [], // start empty
+        });
+      }
+      setNewEquipName("");
+      setNewEquipCat("");
+      setEditEquip(null);
+      setAddEquipOpen(false);
+    } catch (err) {
+      console.error("Greška spremanja opreme:", err);
+      alert("Greška spremanja opreme: " + (err?.message || String(err)));
     }
-    setNewEquipName("");
-    setNewEquipCat("");
-    setEditEquip(null);
-    setAddEquipOpen(false);
   }
 
-  function deleteEquipment(id) {
+  async function deleteEquipment(id) {
     if (!confirm("Obrisati ovu opremu i sve unose?")) return;
-    setOprema((prev) => prev.filter((o) => o.id !== id));
+    try {
+      await KontrolnaKnjigaAPI.remove(id);
+    } catch (err) {
+      console.error("Greška brisanja opreme:", err);
+      alert("Greška brisanja: " + (err?.message || String(err)));
+    }
   }
 
-  /* ==== UNOSI ==== */
+  /* ==== UNOSI (kao array na dokumentu) ==== */
   function openAddEntry(equipId, entry = null) {
     setActiveEquipId(equipId);
     if (entry) {
@@ -215,14 +213,15 @@ export default function KontrolnaKnjiga({ clanovi = [] }) {
     setAddEntryOpen(true);
   }
 
-  function saveEntry() {
+  async function saveEntry() {
     if (!activeEquipId) return;
     const minutes =
       fTimeFrom && fTimeTo
         ? timeToMinutes(fTimeTo) - timeToMinutes(fTimeFrom)
         : 0;
     const entry = {
-      id: editEntry ? editEntry.id : uuidv4(),
+      // id je timestamp + random suffix da izbjegnemo kolizije
+      id: editEntry?.id || `e_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
       naziv: fNaziv,
       datumYMD: toYMD(fDatum),
       vrijemeOd: fTimeFrom,
@@ -236,31 +235,36 @@ export default function KontrolnaKnjiga({ clanovi = [] }) {
       alert("Popuni obavezna polja (datum i korisnik).");
       return;
     }
-    setOprema((prev) =>
-      prev.map((o) =>
-        o.id === activeEquipId
-          ? {
-              ...o,
-              unosi: editEntry
-                ? o.unosi.map((u) => (u.id === entry.id ? entry : u))
-                : [entry, ...o.unosi],
-            }
-          : o
-      )
-    );
-    setAddEntryOpen(false);
-    setEditEntry(null);
+
+    try {
+      const equip = oprema.find((o) => o.id === activeEquipId);
+      if (!equip) return;
+
+      const newUnosi = editEntry
+        ? equip.unosi.map((u) => (u.id === entry.id ? entry : u))
+        : [entry, ...(equip.unosi || [])];
+
+      await KontrolnaKnjigaAPI.update(activeEquipId, { unosi: newUnosi });
+
+      setAddEntryOpen(false);
+      setEditEntry(null);
+    } catch (err) {
+      console.error("Greška spremanja unosa:", err);
+      alert("Greška spremanja unosa: " + (err?.message || String(err)));
+    }
   }
 
-  function deleteEntry(equipId, entryId) {
+  async function deleteEntry(equipId, entryId) {
     if (!confirm("Obrisati ovaj unos?")) return;
-    setOprema((prev) =>
-      prev.map((o) =>
-        o.id === equipId
-          ? { ...o, unosi: o.unosi.filter((u) => u.id !== entryId) }
-          : o
-      )
-    );
+    try {
+      const equip = oprema.find((o) => o.id === equipId);
+      if (!equip) return;
+      const newUnosi = (equip.unosi || []).filter((u) => u.id !== entryId);
+      await KontrolnaKnjigaAPI.update(equipId, { unosi: newUnosi });
+    } catch (err) {
+      console.error("Greška brisanja unosa:", err);
+      alert("Greška brisanja unosa: " + (err?.message || String(err)));
+    }
   }
 
   /* Grupiranje po kategorijama + statistika */
@@ -271,7 +275,7 @@ export default function KontrolnaKnjiga({ clanovi = [] }) {
       const key = o.kategorija || "Ostalo";
       if (!res[key]) res[key] = { items: [], stats: { count: 0, min: 0, lit: 0 } };
       res[key].items.push(o);
-      o.unosi.forEach((u) => {
+      (o.unosi || []).forEach((u) => {
         res[key].stats.count += 1;
         res[key].stats.min += timeToMinutes(u.vrijemeDo) - timeToMinutes(u.vrijemeOd);
         res[key].stats.lit += parseLiters(u.dodanoGorivo);
@@ -337,12 +341,10 @@ export default function KontrolnaKnjiga({ clanovi = [] }) {
                   >
                     <b>{item.naziv}</b>
                     <span style={{ color: "#777" }}>
-                      {item.unosi.length} unosa
+                      {(item.unosi || []).length} unosa
                     </span>
                     <div style={{ flex: 1 }} />
-                    <button onClick={() => openAddEntry(item.id)}>
-                      + Dodaj unos
-                    </button>
+                    <button onClick={() => openAddEntry(item.id)}>+ Dodaj unos</button>
                     <button
                       onClick={() => {
                         setEditEquip(item);
@@ -380,8 +382,8 @@ export default function KontrolnaKnjiga({ clanovi = [] }) {
                         </tr>
                       </thead>
                       <tbody>
-                        {item.unosi.length ? (
-                          item.unosi.map((u) => (
+                        {(item.unosi || []).length ? (
+                          (item.unosi || []).map((u) => (
                             <tr key={u.id}>
                               <td style={td}>{u.naziv || "—"}</td>
                               <td style={td}>{u.datumYMD || "—"}</td>
@@ -461,10 +463,7 @@ export default function KontrolnaKnjiga({ clanovi = [] }) {
             />
           </div>
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-            <button
-              className="btn-secondary"
-              onClick={() => setAddEquipOpen(false)}
-            >
+            <button className="btn-secondary" onClick={() => setAddEquipOpen(false)}>
               Odustani
             </button>
             <button onClick={addOrUpdateEquipment}>Spremi</button>

@@ -1,8 +1,9 @@
+// vite.config.js
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  base: '/dvd-akt/',   // ⬅️ ime tvog GitHub repo-a
+  base: '/',   // root na Firebase Hosting
   plugins: [react()],
 })

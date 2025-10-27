@@ -1,9 +1,11 @@
 // src/pages/MasovnoZaduzenje.jsx
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { v4 as uuidv4 } from "uuid";
 import DatePicker, { registerLocale } from "react-datepicker";
 import hr from "date-fns/locale/hr";
 registerLocale("hr", hr);
+
+import { SkladisteAPI, ZaduzenjaAPI } from "../services/db";
 
 /* datum -> "YYYY-MM-DD" */
 function toYMD(date) {
@@ -20,12 +22,21 @@ function toYMD(date) {
  */
 export default function MasovnoZaduzenje({
   clanovi = [],
-  skladiste,
-  zaduzenja,
-  setZaduzenja = () => {},
   open,               // boolean | undefined
   onClose = () => {}, // callback kad se klikne zatvori/overlay
 }) {
+  const [skladiste, setSkladiste] = useState([]);
+  const [zaduzenja, setZaduzenja] = useState([]);
+
+  useEffect(() => {
+    let unsubs = [];
+    (async () => {
+      unsubs.push(await SkladisteAPI.subscribe(setSkladiste));
+      unsubs.push(await ZaduzenjaAPI.subscribe(setZaduzenja));
+    })();
+    return () => { unsubs.forEach(u => u && u()); };
+  }, []);
+
   const safeClanovi   = Array.isArray(clanovi)   ? clanovi   : [];
   const safeSkladiste = Array.isArray(skladiste) ? skladiste : [];
   const safeZaduzenja = Array.isArray(zaduzenja) ? zaduzenja : [];
@@ -93,7 +104,7 @@ export default function MasovnoZaduzenje({
     Object.keys(validationErrors).length === 0 &&
     rows.every((r) => r.artikalId && parseInt(r.kolicina || 0, 10) >= 1);
 
-  const submit = () => {
+  const submit = async () => {
     if (!canSubmit) return;
     const dateYMD = toYMD(datum) || toYMD(new Date());
     const toInsert = [];
@@ -101,7 +112,6 @@ export default function MasovnoZaduzenje({
       const k = Math.max(0, parseInt(row.kolicina || 0, 10));
       for (let i = 0; i < k; i++) {
         toInsert.push({
-          id: uuidv4(),
           clanId,
           artikalId: row.artikalId,
           oznaka: (row.oznaka || "").trim() || null,
@@ -109,11 +119,18 @@ export default function MasovnoZaduzenje({
         });
       }
     }
-    setZaduzenja([...safeZaduzenja, ...toInsert]);
-    setClanId("");
-    setDatum(null);
-    setRows([{ id: uuidv4(), artikalId: "", kolicina: 1, oznaka: "" }]);
-    onClose(); // zatvori drawer nakon spremanja
+    try {
+      for (const rec of toInsert) {
+        await ZaduzenjaAPI.create(rec);
+      }
+      setClanId("");
+      setDatum(null);
+      setRows([{ id: uuidv4(), artikalId: "", kolicina: 1, oznaka: "" }]);
+      onClose();
+    } catch (err) {
+      console.error("Greška masovnog zaduženja:", err);
+      alert("Greška masovnog zaduženja: " + (err?.message || String(err)));
+    }
   };
 
   const clanName = (id) => {
@@ -267,7 +284,7 @@ export default function MasovnoZaduzenje({
     </div>
   );
 
-  // Ako `open` nije boolean => render kao stranica (bez popouta)
+  // Ako `open` nije boolean => render kao stranica
   if (typeof open !== "boolean") {
     return <div>{Inner}</div>;
   }
@@ -275,12 +292,12 @@ export default function MasovnoZaduzenje({
   // Ako `open === false` => ništa (zatvoren drawer)
   if (!open) return null;
 
-  // Drawer (popout) – koristimo postojeći CSS i dodatno osiguramo širinu inline stilom
+  // Drawer
   return (
     <div className="drawer-backdrop" onClick={onClose}>
       <div
         className="drawer-panel drawer-wide"
-        style={{ width: "clamp(900px, 80vw, 1400px)" }} // osigura ŠIRINU odmah
+        style={{ width: "clamp(900px, 80vw, 1400px)" }}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="drawer-header">

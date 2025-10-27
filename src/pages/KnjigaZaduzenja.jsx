@@ -1,9 +1,11 @@
 // src/pages/KnjigaZaduzenja.jsx
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { v4 as uuidv4 } from "uuid";
 import DatePicker, { registerLocale } from "react-datepicker";
 import hr from "date-fns/locale/hr";
 registerLocale("hr", hr);
+
+import { SkladisteAPI, ZaduzenjaAPI } from "../services/db";
 
 /* datum -> "YYYY-MM-DD" */
 function toYMD(date) {
@@ -14,13 +16,21 @@ function toYMD(date) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
-export default function KnjigaZaduzenja({
-  clanovi = [],
-  skladiste,
-  setSkladiste = () => {},
-  zaduzenja,
-  setZaduzenja = () => {},
-}) {
+export default function KnjigaZaduzenja({ clanovi = [] }) {
+  // čitamo iz Firestore-a
+  const [skladiste, setSkladiste] = useState([]);   // {id, naziv, ukupno}
+  const [zaduzenja, setZaduzenja] = useState([]);   // {id, clanId, artikalId, oznaka?, datumYMD}
+
+  // subscribe na obje kolekcije (realtime)
+  useEffect(() => {
+    let unsubs = [];
+    (async () => {
+      unsubs.push(await SkladisteAPI.subscribe(setSkladiste));
+      unsubs.push(await ZaduzenjaAPI.subscribe(setZaduzenja));
+    })();
+    return () => { unsubs.forEach(u => u && u()); };
+  }, []);
+
   /* ===== Sigurni nizovi ===== */
   const safeClanovi   = Array.isArray(clanovi)   ? clanovi   : [];
   const safeSkladiste = Array.isArray(skladiste) ? skladiste : [];
@@ -30,25 +40,27 @@ export default function KnjigaZaduzenja({
   const [nazivArtikla, setNazivArtikla] = useState("");
   const [kolicina, setKolicina] = useState(1);
 
-  const dodajUNabavu = () => {
+  const dodajUNabavu = async () => {
     const naziv = nazivArtikla.trim();
     const kol = Number(kolicina);
     if (!naziv || !kol || kol < 1) return;
 
     const postoji = safeSkladiste.find(
-      (a) => a.naziv.toLowerCase() === naziv.toLowerCase()
+      (a) => (a.naziv || "").toLowerCase() === naziv.toLowerCase()
     );
-    if (postoji) {
-      const updated = safeSkladiste.map((a) =>
-        a.id === postoji.id ? { ...a, ukupno: (a.ukupno || 0) + kol } : a
-      );
-      setSkladiste(updated);
-    } else {
-      setSkladiste([...safeSkladiste, { id: uuidv4(), naziv, ukupno: kol }]);
-    }
 
-    setNazivArtikla("");
-    setKolicina(1);
+    try {
+      if (postoji) {
+        await SkladisteAPI.update(postoji.id, { ukupno: (postoji.ukupno || 0) + kol });
+      } else {
+        await SkladisteAPI.create({ naziv, ukupno: kol });
+      }
+      setNazivArtikla("");
+      setKolicina(1);
+    } catch (err) {
+      console.error("Greška nabave:", err);
+      alert("Greška pri dodavanju u zalihu: " + (err?.message || String(err)));
+    }
   };
 
   /* ===== Izračuni dostupnosti ===== */
@@ -103,20 +115,24 @@ export default function KnjigaZaduzenja({
   const mozeZaduziti =
     !!clanId && !!artikalId && odabraniArtikal && odabraniArtikal.dostupno > 0;
 
-  const zaduzi = () => {
+  const zaduzi = async () => {
     if (!mozeZaduziti) return;
     const novi = {
-      id: uuidv4(),
       clanId,
       artikalId,
       oznaka: oznaka.trim() || null,
       datumYMD: toYMD(datumZad) || toYMD(new Date()),
     };
-    setZaduzenja([...safeZaduzenja, novi]);
-    setClanId("");
-    setArtikalId("");
-    setOznaka("");
-    setDatumZad(null);
+    try {
+      await ZaduzenjaAPI.create(novi);
+      setClanId("");
+      setArtikalId("");
+      setOznaka("");
+      setDatumZad(null);
+    } catch (err) {
+      console.error("Greška zaduženja:", err);
+      alert("Greška pri zaduženju: " + (err?.message || String(err)));
+    }
   };
 
   /* ===== Filteri / pretraga / export ===== */
@@ -129,7 +145,6 @@ export default function KnjigaZaduzenja({
 
   const zaduzenjaSortFilt = useMemo(() => {
     let list = [...safeZaduzenja];
-
     if (fltClanId)    list = list.filter((z) => z.clanId === fltClanId);
     if (fltArtikalId) list = list.filter((z) => z.artikalId === fltArtikalId);
 
@@ -141,7 +156,7 @@ export default function KnjigaZaduzenja({
         return (
           (c && (`${c.ime} ${c.prezime}`.toLowerCase().includes(q) ||
                  `${c.prezime} ${c.ime}`.toLowerCase().includes(q))) ||
-          (a && a.naziv.toLowerCase().includes(q)) ||
+          (a && (a.naziv || "").toLowerCase().includes(q)) ||
           (z.oznaka && z.oznaka.toLowerCase().includes(q)) ||
           (z.datumYMD && z.datumYMD.includes(q))
         );
@@ -199,7 +214,7 @@ export default function KnjigaZaduzenja({
   const openEditArtikal = (a) => setEditArtikal({ id: a.id, naziv: a.naziv, ukupno: a.ukupno ?? 0 });
   const closeEditArtikal = () => setEditArtikal(null);
 
-  const saveEditArtikal = () => {
+  const saveEditArtikal = async () => {
     if (!editArtikal) return;
     const { id, naziv, ukupno } = editArtikal;
     const trimmed = (naziv || "").trim();
@@ -211,19 +226,28 @@ export default function KnjigaZaduzenja({
       alert(`Ukupna količina (${broj}) ne može biti manja od već zaduženih (${vecZaduzeno}).`);
       return;
     }
-    const updated = safeSkladiste.map((a) => (a.id === id ? { ...a, naziv: trimmed, ukupno: broj } : a));
-    setSkladiste(updated);
-    closeEditArtikal();
+    try {
+      await SkladisteAPI.update(id, { naziv: trimmed, ukupno: broj });
+      closeEditArtikal();
+    } catch (err) {
+      console.error("Greška spremanja artikla:", err);
+      alert("Greška spremanja artikla: " + (err?.message || String(err)));
+    }
   };
 
-  const obrisiArtikal = (id) => {
+  const obrisiArtikal = async (id) => {
     const imaZaduzenja = safeZaduzenja.some((z) => z.artikalId === id);
     if (imaZaduzenja) {
       alert("Ne možeš obrisati artikl koji je zadužen. Prvo obriši/izmijeni zaduženja.");
       return;
     }
     if (!window.confirm("Obrisati ovaj artikl iz skladišta?")) return;
-    setSkladiste(safeSkladiste.filter((a) => a.id !== id));
+    try {
+      await SkladisteAPI.remove(id);
+    } catch (err) {
+      console.error("Greška brisanja artikla:", err);
+      alert("Greška brisanja artikla: " + (err?.message || String(err)));
+    }
   };
 
   /* ===== Uređivanje zaduženja ===== */
@@ -231,7 +255,7 @@ export default function KnjigaZaduzenja({
   const openEditZad = (z) => setEditZad({ id: z.id, clanId: z.clanId, artikalId: z.artikalId, oznaka: z.oznaka || "", datumYMD: z.datumYMD || "" });
   const closeEditZad = () => setEditZad(null);
 
-  const saveEditZad = () => {
+  const saveEditZad = async () => {
     if (!editZad) return;
     const { id, clanId: ecid, artikalId: eaid, oznaka, datumYMD } = editZad;
     if (!ecid || !eaid) return;
@@ -240,19 +264,18 @@ export default function KnjigaZaduzenja({
       alert("Nema dostupnih komada odabranog artikla za ovo zaduženje.");
       return;
     }
-    const updated = safeZaduzenja.map((z) =>
-      z.id === id
-        ? {
-            ...z,
-            clanId: ecid,
-            artikalId: eaid,
-            oznaka: (oznaka || "").trim() || null,
-            datumYMD: datumYMD || toYMD(new Date()),
-          }
-        : z
-    );
-    setZaduzenja(updated);
-    closeEditZad();
+    try {
+      await ZaduzenjaAPI.update(id, {
+        clanId: ecid,
+        artikalId: eaid,
+        oznaka: (oznaka || "").trim() || null,
+        datumYMD: datumYMD || toYMD(new Date()),
+      });
+      closeEditZad();
+    } catch (err) {
+      console.error("Greška spremanja zaduženja:", err);
+      alert("Greška spremanja zaduženja: " + (err?.message || String(err)));
+    }
   };
 
   /* ===== Masovno zaduživanje (modal) ===== */
@@ -302,7 +325,7 @@ export default function KnjigaZaduzenja({
     Object.keys(massErrors).length === 0 &&
     massRows.every((r) => r.artikalId && parseInt(r.kolicina || 0, 10) >= 1);
 
-  const massSubmit = () => {
+  const massSubmit = async () => {
     if (!massCanSubmit) return;
     const dateYMD = toYMD(massDatum) || toYMD(new Date());
     const toInsert = [];
@@ -310,7 +333,6 @@ export default function KnjigaZaduzenja({
       const k = Math.max(0, parseInt(row.kolicina || 0, 10));
       for (let i = 0; i < k; i++) {
         toInsert.push({
-          id: uuidv4(),
           clanId: massClanId,
           artikalId: row.artikalId,
           oznaka: (row.oznaka || "").trim() || null,
@@ -318,12 +340,20 @@ export default function KnjigaZaduzenja({
         });
       }
     }
-    setZaduzenja([...safeZaduzenja, ...toInsert]);
-    // reset
-    setMassClanId("");
-    setMassDatum(null);
-    setMassRows([{ id: uuidv4(), artikalId: "", kolicina: 1, oznaka: "" }]);
-    setMassOpen(false);
+    try {
+      // serijski inserti (jednostavno); po želji kasnije prebacimo na batch
+      for (const rec of toInsert) {
+        await ZaduzenjaAPI.create(rec);
+      }
+      // reset
+      setMassClanId("");
+      setMassDatum(null);
+      setMassRows([{ id: uuidv4(), artikalId: "", kolicina: 1, oznaka: "" }]);
+      setMassOpen(false);
+    } catch (err) {
+      console.error("Greška masovnog zaduženja:", err);
+      alert("Greška masovnog zaduženja: " + (err?.message || String(err)));
+    }
   };
 
   /* ===== UI state: sklopive zalihe + brza pretraga ===== */
@@ -333,7 +363,7 @@ export default function KnjigaZaduzenja({
   const artikliFiltrirani = useMemo(() => {
     if (!quickSearch.trim()) return artikliSDostupnim;
     const q = quickSearch.trim().toLowerCase();
-    return artikliSDostupnim.filter((a) => a.naziv.toLowerCase().includes(q));
+    return artikliSDostupnim.filter((a) => (a.naziv || "").toLowerCase().includes(q));
   }, [quickSearch, artikliSDostupnim]);
 
   return (
@@ -609,10 +639,18 @@ export default function KnjigaZaduzenja({
                       <button className="btn-secondary" onClick={() => openEditZad(z)}>
                         Uredi
                       </button>
-                      <button className="btn-danger" onClick={() => {
-                        if (!window.confirm("Obrisati ovaj zapis zaduženja?")) return;
-                        setZaduzenja(safeZaduzenja.filter((x) => x.id !== z.id));
-                      }}>
+                      <button
+                        className="btn-danger"
+                        onClick={async () => {
+                          if (!window.confirm("Obrisati ovaj zapis zaduženja?")) return;
+                          try {
+                            await ZaduzenjaAPI.remove(z.id);
+                          } catch (err) {
+                            console.error("Greška brisanja zaduženja:", err);
+                            alert("Greška brisanja: " + (err?.message || String(err)));
+                          }
+                        }}
+                      >
                         Obriši
                       </button>
                     </div>
@@ -738,15 +776,13 @@ export default function KnjigaZaduzenja({
         </div>
       )}
 
-      {/* ===== MODAL: Masovno zaduživanje (ŠIROKO) ===== */}
+      {/* ===== MODAL: Masovno zaduživanje (ugrađeno) ===== */}
       {massOpen && (
         <div className="modal-overlay" onMouseDown={(e) => e.stopPropagation()}>
           <div
             className="modal"
             onMouseDown={(e) => e.stopPropagation()}
-            style={{
-              width: "min(1100px, 96vw)",   // <<<<<< OVDJE GA ŠIRIMO
-            }}
+            style={{ width: "min(1100px, 96vw)" }}
           >
             <h3>Masovno zaduživanje</h3>
 
@@ -791,13 +827,12 @@ export default function KnjigaZaduzenja({
                     if (!row.artikalId) err = "Odaberi artikl.";
                     const k = Math.max(0, parseInt(row.kolicina || 0, 10));
                     if (!err && k < 1) err = "Količina mora biti ≥ 1.";
-
                     return (
                       <tr key={row.id}>
                         <td>
                           <select
                             value={row.artikalId}
-                            onChange={(e) => massUpdateRow(row.id, { artikalId: e.target.value })}
+                            onChange={(e) => setMassRows((r) => r.map((x) => x.id === row.id ? { ...x, artikalId: e.target.value } : x))}
                           >
                             <option value="">Odaberi artikl…</option>
                             {safeSkladiste.map((a) => (
@@ -807,26 +842,23 @@ export default function KnjigaZaduzenja({
                             ))}
                           </select>
                         </td>
-
                         <td>
                           <input
                             type="number"
                             min={1}
                             value={row.kolicina}
-                            onChange={(e) => massUpdateRow(row.id, { kolicina: e.target.value })}
+                            onChange={(e) => setMassRows((r) => r.map((x) => x.id === row.id ? { ...x, kolicina: e.target.value } : x))}
                             style={{ maxWidth: 130 }}
                           />
                         </td>
-
                         <td>
                           <input
                             type="text"
                             placeholder="oznaka / inventarski br."
                             value={row.oznaka}
-                            onChange={(e) => massUpdateRow(row.id, { oznaka: e.target.value })}
+                            onChange={(e) => setMassRows((r) => r.map((x) => x.id === row.id ? { ...x, oznaka: e.target.value } : x))}
                           />
                         </td>
-
                         <td>
                           <span
                             className="badge"
@@ -840,12 +872,11 @@ export default function KnjigaZaduzenja({
                             {row.artikalId ? free : "—"}
                           </span>
                         </td>
-
                         <td>
                           <div className="actions">
                             <button
                               className="btn-danger"
-                              onClick={() => massRemoveRow(row.id)}
+                              onClick={() => setMassRows((r) => (r.length > 1 ? r.filter((x) => x.id !== row.id) : r))}
                               disabled={massRows.length === 1}
                             >
                               Ukloni
@@ -868,7 +899,7 @@ export default function KnjigaZaduzenja({
             </div>
 
             <div className="drawer-actions" style={{ borderTop: "none", paddingTop: 0 }}>
-              <button className="btn-secondary" onClick={massAddRow}>Dodaj stavku</button>
+              <button className="btn-secondary" onClick={() => setMassRows((r) => [...r, { id: uuidv4(), artikalId: "", kolicina: 1, oznaka: "" }])}>Dodaj stavku</button>
               <div style={{ flex: 1 }} />
               <button onClick={massSubmit} disabled={!massCanSubmit}>
                 Zaduži odabrane

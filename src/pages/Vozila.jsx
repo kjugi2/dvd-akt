@@ -1,12 +1,12 @@
 // src/pages/Vozila.jsx
-import { useState, useMemo } from "react";
-import { v4 as uuidv4 } from "uuid"; // npm i uuid
-import DatePicker from "react-datepicker";
-import { registerLocale } from "react-datepicker";
+import { useState, useMemo, useEffect } from "react";
+import DatePicker, { registerLocale } from "react-datepicker";
 import hr from "date-fns/locale/hr";
 registerLocale("hr", hr);
 
-// helperi za "YYYY-MM-DD"
+import { VozilaAPI } from "../services/db";
+
+/* ===== Helperi: datum <-> "YYYY-MM-DD" ===== */
 function toYMD(date) {
   if (!date) return "";
   const d = date instanceof Date ? date : new Date(date);
@@ -16,24 +16,62 @@ function toYMD(date) {
 }
 function fromYMD(ymd) {
   if (!ymd) return null;
-  const [y, m, d] = ymd.split("-").map(Number);
+  const [y, m, d] = (ymd || "").split("-").map(Number);
   if (!y || !m || !d) return null;
   return new Date(y, m - 1, d);
 }
 
-export default function Vozila({ vozila, setVozila }) {
+export default function Vozila() {
+  // === LOKALNO STANJE (kao u Clanovi.jsx) ===
+  const [vozila, setVozila] = useState([]);
+  const [lastError, setLastError] = useState("");
+
   const [showForm, setShowForm] = useState(false);
 
   // polja forme
   const [tip, setTip] = useState("");
   const [model, setModel] = useState("");
   const [registracija, setRegistracija] = useState("");
-  // u UI držimo Date objekte, u bazi/tablici "YYYY-MM-DD"
   const [tehnickiDate, setTehnickiDate] = useState(null);
   const [servisDate, setServisDate] = useState(null);
   const [status, setStatus] = useState("");
 
   const [editId, setEditId] = useState(null);
+  const [saving, setSaving] = useState(false);
+
+  // custom confirm modal za brisanje
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmId, setConfirmId] = useState(null);
+
+  /* === UČITAVANJE IZ BAZE (REALTIME) === */
+  useEffect(() => {
+    let unsub;
+    (async () => {
+      try {
+        unsub = await VozilaAPI.subscribe(setVozila);
+      } catch (err) {
+        console.error("Greška pri subscribe-u na vozila:", err);
+        setLastError(err?.message || String(err));
+      }
+    })();
+    // ESC zatvaranje forma/confirm
+    const onEsc = (e) => {
+      if (e.key === "Escape") {
+        if (confirmOpen) {
+          setConfirmOpen(false);
+          setConfirmId(null);
+        } else if (showForm) {
+          resetForm();
+          setShowForm(false);
+        }
+      }
+    };
+    window.addEventListener("keydown", onEsc);
+    return () => {
+      unsub && unsub();
+      window.removeEventListener("keydown", onEsc);
+    };
+  }, [showForm, confirmOpen]);
 
   const resetForm = () => {
     setTip("");
@@ -43,48 +81,64 @@ export default function Vozila({ vozila, setVozila }) {
     setServisDate(null);
     setStatus("");
     setEditId(null);
+    setSaving(false);
+    setLastError("");
   };
 
-  // Dodavanje novog vozila
-  const dodajVozilo = () => {
-    if (!tip || !model.trim() || !registracija.trim() || !status) return;
-
-    const novo = {
-      id: uuidv4(),
-      tip,
-      model,
-      registracija,
-      tehnicki: toYMD(tehnickiDate), // spremamo string
-      servis: toYMD(servisDate),     // spremamo string
-      status,
-    };
-
-    setVozila([...vozila, novo]);
-    resetForm();
-    setShowForm(false);
+  // Dodavanje u Firestore
+  const dodajVozilo = async () => {
+    if (!tip || !model.trim() || !registracija.trim() || !status) {
+      alert("Tip, model, registracija i status su obavezni.");
+      return;
+    }
+    setSaving(true);
+    setLastError("");
+    try {
+      const payload = {
+        tip,
+        model: model.trim(),
+        registracija: registracija.trim().toUpperCase(),
+        tehnicki: toYMD(tehnickiDate) || "",
+        servis: toYMD(servisDate) || "",
+        status,
+      };
+      console.log("[Vozila] create payload:", payload);
+      await VozilaAPI.create(payload);
+      resetForm();
+      setShowForm(false); // subscribe će donijeti novi zapis
+    } catch (err) {
+      console.error("Greška pri dodavanju vozila:", err);
+      setLastError(err?.message || String(err));
+      setSaving(false);
+    }
   };
 
-  // Spremanje izmjena postojećeg vozila
-  const spremiVozilo = () => {
-    if (!editId || !tip || !model.trim() || !registracija.trim() || !status) return;
-
-    const updated = vozila.map((v) =>
-      v.id === editId
-        ? {
-            ...v,
-            tip,
-            model,
-            registracija,
-            tehnicki: toYMD(tehnickiDate),
-            servis: toYMD(servisDate),
-            status,
-          }
-        : v
-    );
-
-    setVozila(updated);
-    resetForm();
-    setShowForm(false);
+  // Spremanje izmjena u Firestore
+  const spremiVozilo = async () => {
+    if (!editId || !tip || !model.trim() || !registracija.trim() || !status) {
+      alert("Tip, model, registracija i status su obavezni.");
+      return;
+    }
+    setSaving(true);
+    setLastError("");
+    try {
+      const payload = {
+        tip,
+        model: model.trim(),
+        registracija: registracija.trim().toUpperCase(),
+        tehnicki: toYMD(tehnickiDate) || "",
+        servis: toYMD(servisDate) || "",
+        status,
+      };
+      console.log("[Vozila] update payload:", editId, payload);
+      await VozilaAPI.update(editId, payload);
+      resetForm();
+      setShowForm(false);
+    } catch (err) {
+      console.error("Greška pri spremanju vozila:", err);
+      setLastError(err?.message || String(err));
+      setSaving(false);
+    }
   };
 
   // Uređivanje
@@ -101,19 +155,54 @@ export default function Vozila({ vozila, setVozila }) {
     setShowForm(true);
   };
 
-  // Brisanje
-  const obrisi = (id) => {
-    if (!window.confirm("Sigurno obrisati vozilo?")) return;
-    setVozila(vozila.filter((v) => v.id !== id));
+  // Klik na "Obriši" -> otvori custom confirm
+  const potvrdiBrisanje = (id) => {
+    setConfirmId(id);
+    setConfirmOpen(true);
+  };
+
+  // Brisanje (iz confirm modala)
+  const obrisiPotvrdjeno = async () => {
+    const id = confirmId;
+    setConfirmOpen(false);
+    setConfirmId(null);
+    if (!id) return;
+    try {
+      await VozilaAPI.remove(id);
+    } catch (err) {
+      console.error("Greška pri brisanju vozila:", err);
+      setLastError(err?.message || String(err));
+    }
   };
 
   const filtered = useMemo(() => vozila, [vozila]);
 
+  const voziloZaPotvrdu = useMemo(() => {
+    if (!confirmId) return null;
+    return filtered.find((v) => v.id === confirmId) || null;
+  }, [confirmId, filtered]);
+
   return (
-    <div>
+    <div className="main-content">
       <h2>Vozila</h2>
 
-      {vozila.length === 0 && (
+      {/* Error banner ako nešto pođe po zlu (rules, offline, sl.) */}
+      {lastError && (
+        <div
+          style={{
+            background: "#ffe6e6",
+            border: "1px solid #ffb3b3",
+            color: "#900",
+            padding: "8px 12px",
+            borderRadius: 6,
+            marginBottom: 12,
+          }}
+        >
+          <b>Greška:</b> {lastError}
+        </div>
+      )}
+
+      {filtered.length === 0 && (
         <div className="info">
           Nema vozila u bazi. Klikni <b>Dodaj vozilo</b> za unos prvog.
         </div>
@@ -121,7 +210,7 @@ export default function Vozila({ vozila, setVozila }) {
 
       <button onClick={() => setShowForm(true)}>Dodaj vozilo</button>
 
-      <div className="table-wrap" style={{ marginTop: "12px" }}>
+      <div className="table-wrap" style={{ marginTop: 12 }}>
         <table>
           <thead>
             <tr>
@@ -137,20 +226,20 @@ export default function Vozila({ vozila, setVozila }) {
           </thead>
           <tbody>
             {filtered.map((v, i) => (
-              <tr key={v.id}>
+              <tr key={v.id || i}>
                 <td>{i + 1}</td>
-                <td>{v.tip}</td>
-                <td>{v.model}</td>
-                <td>{v.registracija}</td>
+                <td>{v.tip || "—"}</td>
+                <td>{v.model || "—"}</td>
+                <td>{v.registracija || "—"}</td>
                 <td>{v.tehnicki || "—"}</td>
                 <td>{v.servis || "—"}</td>
-                <td>{v.status}</td>
+                <td>{v.status || "—"}</td>
                 <td>
                   <div className="actions">
                     <button className="btn-secondary" onClick={() => uredi(v.id)}>
                       Uredi
                     </button>
-                    <button className="btn-danger" onClick={() => obrisi(v.id)}>
+                    <button className="btn-danger" onClick={() => potvrdiBrisanje(v.id)}>
                       Obriši
                     </button>
                   </div>
@@ -159,7 +248,7 @@ export default function Vozila({ vozila, setVozila }) {
             ))}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan="8">Nema unosa.</td>
+                <td colSpan={8}>Nema unosa.</td>
               </tr>
             )}
           </tbody>
@@ -168,8 +257,8 @@ export default function Vozila({ vozila, setVozila }) {
 
       {/* Modal forma */}
       {showForm && (
-        <div className="modal-overlay">
-          <div className="modal">
+        <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => { resetForm(); setShowForm(false); }}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
             <h3>{editId ? "Uredi vozilo" : "Dodaj vozilo"}</h3>
 
             <div className="modal-body">
@@ -177,9 +266,9 @@ export default function Vozila({ vozila, setVozila }) {
                 <label>Tipizacija vozila</label>
                 <select value={tip} onChange={(e) => setTip(e.target.value)}>
                   <option value="">Odaberi tip…</option>
-                  <option>Navalno vozilo</option>
-                  <option>Kombi</option>
-                  <option>Ostalo</option>
+                  <option value="Navalno vozilo">Navalno vozilo</option>
+                  <option value="Kombi">Kombi</option>
+                  <option value="Ostalo">Ostalo</option>
                 </select>
               </div>
 
@@ -241,23 +330,61 @@ export default function Vozila({ vozila, setVozila }) {
                 <label>Status</label>
                 <select value={status} onChange={(e) => setStatus(e.target.value)}>
                   <option value="">Odaberi status…</option>
-                  <option>Operativno</option>
-                  <option>U servisu</option>
-                  <option>Neispravno</option>
+                  <option value="Operativno">Operativno</option>
+                  <option value="U servisu">U servisu</option>
+                  <option value="Neispravno">Neispravno</option>
                 </select>
               </div>
 
               <div className="form-row">
                 {editId ? (
-                  <button onClick={spremiVozilo}>Spremi izmjene</button>
+                  <button disabled={saving} onClick={spremiVozilo}>
+                    {saving ? "Spremam..." : "Spremi izmjene"}
+                  </button>
                 ) : (
-                  <button onClick={dodajVozilo}>Spremi</button>
+                  <button disabled={saving} onClick={dodajVozilo}>
+                    {saving ? "Spremam..." : "Spremi"}
+                  </button>
                 )}
                 <button
                   className="btn-secondary"
                   onClick={() => {
                     resetForm();
                     setShowForm(false);
+                  }}
+                >
+                  Odustani
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Custom confirm modal za brisanje */}
+      {confirmOpen && (
+        <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => { setConfirmOpen(false); setConfirmId(null); }}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h3>Potvrda brisanja</h3>
+            <div className="modal-body">
+              <p style={{ marginBottom: 16 }}>
+                Sigurno obrisati vozilo{" "}
+                <b>
+                  {voziloZaPotvrdu
+                    ? `${voziloZaPotvrdu.model || "bez modela"} (${voziloZaPotvrdu.registracija || "bez registracije"})`
+                    : "?"}
+                </b>
+                ?
+              </p>
+              <div className="form-row">
+                <button className="btn-danger" onClick={obrisiPotvrdjeno}>
+                  Da, obriši
+                </button>
+                <button
+                  className="btn-secondary"
+                  onClick={() => {
+                    setConfirmOpen(false);
+                    setConfirmId(null);
                   }}
                 >
                   Odustani

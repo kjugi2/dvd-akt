@@ -1,11 +1,9 @@
 // src/pages/Clanovi.jsx
-import { useState, useMemo } from "react";
-import { makeId } from "../utils/id";
-import DatePicker from "react-datepicker";
-import { registerLocale } from "react-datepicker";
+import { useState, useMemo, useEffect } from "react";
+import DatePicker, { registerLocale } from "react-datepicker";
 import hr from "date-fns/locale/hr";
+import { ClanoviAPI } from "../services/db";
 
-// HR lokalizacija
 registerLocale("hr", hr);
 
 // utili: konverzija datuma
@@ -23,21 +21,38 @@ function fromYMD(ymd) {
   return new Date(y, m - 1, d);
 }
 
-export default function Clanovi({ clanovi, setClanovi }) {
-  const [showForm, setShowForm] = useState(false);
+export default function Clanovi() {
+  const [clanovi, setClanovi] = useState([]);
 
-  // polja forme
+  const [showForm, setShowForm] = useState(false);
   const [ime, setIme] = useState("");
   const [prezime, setPrezime] = useState("");
   const [uloga, setUloga] = useState("");
   const [telefon, setTelefon] = useState("");
   const [email, setEmail] = useState("");
-  // u UI radimo s Date objektima
   const [datumRodenjaDate, setDatumRodenjaDate] = useState(null);
   const [oib, setOib] = useState("");
   const [lijecnickiDate, setLijecnickiDate] = useState(null);
-
   const [editId, setEditId] = useState(null);
+
+  // realtime subscribe + ESC za zatvaranje
+  useEffect(() => {
+    let unsub;
+    (async () => {
+      unsub = await ClanoviAPI.subscribe(setClanovi);
+    })();
+    const onEsc = (e) => {
+      if (e.key === "Escape") {
+        resetForm();
+        setShowForm(false);
+      }
+    };
+    window.addEventListener("keydown", onEsc);
+    return () => {
+      unsub && unsub();
+      window.removeEventListener("keydown", onEsc);
+    };
+  }, []);
 
   const resetForm = () => {
     setIme("");
@@ -51,44 +66,34 @@ export default function Clanovi({ clanovi, setClanovi }) {
     setEditId(null);
   };
 
-  const dodajClana = () => {
+  const dodajClana = async () => {
     if (!ime.trim() || !prezime.trim() || !uloga) return;
-    setClanovi([
-      ...clanovi,
-      {
-        id: makeId(),
-        ime,
-        prezime,
-        uloga,
-        telefon,
-        email,
-        datumRodenja: toYMD(datumRodenjaDate), // spremamo "YYYY-MM-DD"
-        oib,
-        lijecnicki: toYMD(lijecnickiDate),     // spremamo "YYYY-MM-DD"
-      },
-    ]);
+    await ClanoviAPI.create({
+      ime,
+      prezime,
+      uloga,
+      telefon,
+      email,
+      datumRodenja: toYMD(datumRodenjaDate),
+      oib,
+      lijecnicki: toYMD(lijecnickiDate),
+    });
     resetForm();
-    setShowForm(false);
+    setShowForm(false); // subscribe će povući novi zapis
   };
 
-  const spremiClana = () => {
+  const spremiClana = async () => {
     if (!editId || !ime.trim() || !prezime.trim() || !uloga) return;
-    const copy = clanovi.map((c) =>
-      c.id === editId
-        ? {
-            ...c,
-            ime,
-            prezime,
-            uloga,
-            telefon,
-            email,
-            datumRodenja: toYMD(datumRodenjaDate),
-            oib,
-            lijecnicki: toYMD(lijecnickiDate),
-          }
-        : c
-    );
-    setClanovi(copy);
+    await ClanoviAPI.update(editId, {
+      ime,
+      prezime,
+      uloga,
+      telefon,
+      email,
+      datumRodenja: toYMD(datumRodenjaDate),
+      oib,
+      lijecnicki: toYMD(lijecnickiDate),
+    });
     resetForm();
     setShowForm(false);
   };
@@ -108,9 +113,9 @@ export default function Clanovi({ clanovi, setClanovi }) {
     setShowForm(true);
   };
 
-  const obrisi = (id) => {
+  const obrisi = async (id) => {
     if (!window.confirm("Sigurno obrisati člana?")) return;
-    setClanovi(clanovi.filter((c) => c.id !== id));
+    await ClanoviAPI.remove(id);
   };
 
   const filtered = useMemo(() => clanovi, [clanovi]);
@@ -178,11 +183,10 @@ export default function Clanovi({ clanovi, setClanovi }) {
 
       {/* Modal forma */}
       {showForm && (
-        <div className="modal-overlay">
-          <div className="modal">
+        <div className="modal-overlay" onClick={() => { resetForm(); setShowForm(false); }}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
             <h3>{editId ? "Uredi člana" : "Dodaj člana"}</h3>
 
-            {/* preporuka: ako ti modal reže popup, omotaj polja u .modal-body koja skrola */}
             <div className="modal-body">
               <div className="form-col">
                 <label>Ime</label>
